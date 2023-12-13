@@ -1,4 +1,4 @@
 # Ignore files related to env
-.env
+*.env
 # Ignore files related to env
-.xml
+*.xml
