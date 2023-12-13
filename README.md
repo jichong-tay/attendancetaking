@@ -1,5 +1,5 @@
 
-**Read Me**
+**Readme**
 
 Default admin user is ```admin```
 
