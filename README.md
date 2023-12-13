@@ -2,9 +2,11 @@ attendancetaking
 
 _**Rapid Development of Attendance Taking Application using Templates and Go**_
 
-Instructions
+
 
 ```
+Instructions
+
 Minimal Requirement
 
 Material covered in Networking in Go:
