@@ -1,6 +1,6 @@
 
 **Read Me**
-
+Default Configuration
 Default admin user is ```admin```
 
 Default password is stored in ```.env``` file
