@@ -1,16 +1,13 @@
 package main
 
 import (
-	"encoding/xml"
 	"fmt"
 	"html/template"
 	"log"
 	"net/http"
-	"os"
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -29,48 +26,36 @@ func route() {
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/logout", logout)
 	http.HandleFunc("/record", record)
-	http.HandleFunc("/upload", uploadFile)
+	http.HandleFunc("/upload", uploadXML)
+	http.HandleFunc("/export", exportXML)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
 }
 
-func uploadFile(res http.ResponseWriter, req *http.Request) {
+func exportXML(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
+	}
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+	datafile.Attendancelist = attendancedb
+	fmt.Println(datafile)
+	xmlData := generateXMLData(datafile)
+	res.Header().Set("Content-Disposition", "attachment; filename=datafile.xml")
+	res.Header().Set("Content-Type", "application/xml")
+	res.Write(xmlData)
+}
+
+func uploadXML(res http.ResponseWriter, req *http.Request) {
 	fmt.Fprintf(res, "Uploading File")
-	//1. parse input, type multipart/form-data
 	//2. retreieve file from posted form-data
 	//3. write temporary file on our server
 	//4. return whether or not this is successful
 
-}
-
-func readDBv2(filename string, datafile data) {
-	f, err := os.Open(filename)
-	if nil != err {
-		log.Fatal(err)
-	}
-	defer f.Close()
-
-	decoder := xml.NewDecoder(f)
-	decoder.Decode(&datafile)
-	attendancedb = datafile.Attendancelist
-
-	//godotenv to load environment file
-	err = godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	//default password get from environment file
-	password := os.Getenv("PASSWORD")
-	bPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
-
-	for _, v := range attendancedb {
-		mapUsers[v.Username] = user{
-			Username: v.Username,
-			Password: bPassword,
-			Isadmin:  false,
-		}
-
-	}
 }
 
 func index(res http.ResponseWriter, req *http.Request) {

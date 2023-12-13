@@ -31,15 +31,6 @@ func init() {
 		Isadmin:  true,
 	}
 
-	// mapUsers["john"] = user{
-	// 	Username: "john",
-	// 	Password: bPassword,
-	// 	Isadmin:  false,
-	// }
-
-	// attendancedb = append(attendancedb, attendance{"john", "mon"})
-	// attendancedb = append(attendancedb, attendance{"john", "tues"})
-
 }
 func main() {
 

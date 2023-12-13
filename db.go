@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/xml"
 	"log"
 	"os"
@@ -68,7 +69,7 @@ func readDB(filename string, datafile data) {
 	}
 }
 
-func writeDB(filename string, datafile data) {
+func backup(filename string, datafile data) {
 	f, err := os.Create(filename)
 	if nil != err {
 		log.Fatal(err)
@@ -77,4 +78,19 @@ func writeDB(filename string, datafile data) {
 
 	xmlEncoder := xml.NewEncoder(f)
 	xmlEncoder.Encode(&datafile)
+}
+
+func generateXMLData(datafile data) []byte {
+	// Create a buffer to store the XML data
+	buffer := &bytes.Buffer{}
+	// Create an XML encoder using the buffer
+	xmlEncoder := xml.NewEncoder(buffer)
+
+	// Encode the datafile into XML
+	if err := xmlEncoder.Encode(&datafile); err != nil {
+		log.Fatal(err)
+	}
+
+	// Return the byte slice containing the XML data
+	return buffer.Bytes()
 }
