@@ -1,5 +1,24 @@
-attendancetaking
 
+**Read Me**
+
+Default admin user is ```admin```
+
+Default password is stored in ```.env``` file
+
+create a ```database.xml``` at ```./data``` folder. 
+
+xml file format for ```database.xml``` :
+
+```
+<data>
+    <attendence>
+        <username>user 1</username>
+    </attendence>
+        <attendence>
+        <username>user 2</username>
+    </attendence>
+</data>
+```
 _**Rapid Development of Attendance Taking Application using Templates and Go**_
 
 
