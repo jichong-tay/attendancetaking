@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -38,7 +37,6 @@ func main() {
 	log.Println("server started")
 
 	readDB(filename, datafile)
-	fmt.Println("main database:", datafile.Attendancelist)
-	//writeDB(filename, datafile)
-	http.ListenAndServe(":5221", nil)
+	log.Println("main database:", datafile.Attendancelist)
+	log.Fatal(http.ListenAndServe(":5221", nil))
 }

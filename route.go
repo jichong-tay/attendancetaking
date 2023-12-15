@@ -28,8 +28,24 @@ func route() {
 	http.HandleFunc("/record", record)
 	http.HandleFunc("/upload", uploadXML)
 	http.HandleFunc("/export", exportXML)
+	http.HandleFunc("/backup", backupDB)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
+}
+
+func backupDB(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
+	}
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+	datafile.Attendancelist = attendancedb
+	backup(filename, datafile)
+	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
 func exportXML(res http.ResponseWriter, req *http.Request) {
@@ -43,8 +59,8 @@ func exportXML(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	datafile.Attendancelist = attendancedb
-	fmt.Println(datafile)
 	xmlData := generateXMLData(datafile)
+
 	res.Header().Set("Content-Disposition", "attachment; filename=datafile.xml")
 	res.Header().Set("Content-Type", "application/xml")
 	res.Write(xmlData)
@@ -74,7 +90,6 @@ func index(res http.ResponseWriter, req *http.Request) {
 	if err := tpl.ExecuteTemplate(res, "index.gohtml", userAttendance); err != nil {
 		log.Println(err)
 	}
-
 }
 
 func restricted(res http.ResponseWriter, req *http.Request) {
