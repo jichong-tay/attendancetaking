@@ -39,7 +39,7 @@ type userAttendance struct {
 	AlreadyLoggedIn bool
 }
 
-func readDB(filename string, datafile data) {
+func loadDB(filename string, datafile data) {
 	f, err := os.Open(filename)
 	if nil != err {
 		log.Fatal(err)
@@ -69,7 +69,7 @@ func readDB(filename string, datafile data) {
 	}
 }
 
-func backup(filename string, datafile data) {
+func backupDB(filename string, datafile data) {
 	f, err := os.Create(filename)
 	if nil != err {
 		log.Fatal(err)

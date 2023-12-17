@@ -3,8 +3,11 @@ package main
 import (
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"time"
 
 	uuid "github.com/google/uuid"
@@ -27,13 +30,14 @@ func route() {
 	http.HandleFunc("/logout", logout)
 	http.HandleFunc("/record", record)
 	http.HandleFunc("/upload", uploadXML)
+	http.HandleFunc("/import", importXML)
 	http.HandleFunc("/export", exportXML)
-	http.HandleFunc("/backup", backupDB)
+	http.HandleFunc("/backup", backup)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
 }
 
-func backupDB(res http.ResponseWriter, req *http.Request) {
+func backup(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -44,7 +48,7 @@ func backupDB(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	datafile.Attendancelist = attendancedb
-	backup(filename, datafile)
+	backupDB(filename, datafile)
 	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
@@ -67,11 +71,60 @@ func exportXML(res http.ResponseWriter, req *http.Request) {
 }
 
 func uploadXML(res http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(res, "Uploading File")
-	//2. retreieve file from posted form-data
-	//3. write temporary file on our server
-	//4. return whether or not this is successful
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
+	}
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+	//check to ensure method is post
+	if req.Method != "POST" {
+		http.Redirect(res, req, "/restricted", http.StatusSeeOther)
+		return
+	}
 
+	//parse input, type multipart/form-data, checking file size)
+	req.Body = http.MaxBytesReader(res, req.Body, max_upload_size)
+	if err := req.ParseMultipartForm(max_upload_size); err != nil {
+		http.Error(res, fmt.Sprintf("The uploaded file is too big. Please choose an file less than %d mb \n %s \n", max_upload_size/1000, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	//retreieve file from posted form-data
+	file, fileHeader, err := req.FormFile("myFile")
+
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	defer file.Close()
+
+	log.Printf("Uploaded File: %+v\n", fileHeader)
+
+	//write temporary file on our server
+
+	dst, err := os.Create(fmt.Sprintf("./data/database%s", filepath.Ext(fileHeader.Filename)))
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	defer dst.Close()
+
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	loadDB(filename, datafile)
+
+	log.Printf("Upload successful.\n")
+	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
 func index(res http.ResponseWriter, req *http.Request) {
@@ -104,6 +157,22 @@ func restricted(res http.ResponseWriter, req *http.Request) {
 	}
 
 	if err := tpl.ExecuteTemplate(res, "restricted.gohtml", attendancedb); err != nil {
+		log.Println(err)
+	}
+}
+
+func importXML(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
+	}
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+
+	if err := tpl.ExecuteTemplate(res, "import.gohtml", attendancedb); err != nil {
 		log.Println(err)
 	}
 }

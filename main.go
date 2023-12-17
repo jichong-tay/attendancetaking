@@ -10,7 +10,8 @@ import (
 )
 
 const (
-	filename = "data/database.xml"
+	filename        = "data/database.xml"
+	max_upload_size = 1 << 20 //1 mb
 )
 
 func init() {
@@ -36,7 +37,7 @@ func main() {
 	route()
 	log.Println("server started")
 
-	readDB(filename, datafile)
+	loadDB(filename, datafile)
 	log.Println("main database:", datafile.Attendancelist)
 	log.Fatal(http.ListenAndServe(":5221", nil))
 }
