@@ -52,7 +52,13 @@ func backup(res http.ResponseWriter, req *http.Request) {
 	datafile.Attendancelist = attendancedb
 	//backupDB is to save the db to xml
 	backupDB(filename, datafile)
-	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
+
+	// Show a message that the backup is completed
+	message := "Backup completed successfully!"
+	res.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	res.Header().Set("X-Content-Type-Options", "nosniff")
+	res.WriteHeader(http.StatusOK)
+	fmt.Fprintln(res, message)
 }
 
 // export database to xml
