@@ -39,5 +39,6 @@ func main() {
 
 	loadDB(filename, datafile)
 	log.Println("main database:", datafile.Attendancelist)
-	log.Fatal(http.ListenAndServe(":5221", nil))
+	//log.Fatal(http.ListenAndServe(":5221", nil))
+	log.Fatal(http.ListenAndServeTLS(":5221", "cert.pem", "key.pem", nil))
 }

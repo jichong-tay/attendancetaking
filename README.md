@@ -1,6 +1,21 @@
 
 **Readme**
-Default Configuration
+
+**Cybersecurity**
+
+1. Use of Go Template Engine (html/template)
+    1. change the display of content according to context.
+    2. escape the content correctly
+2. Use of HTTP/TLS
+    1. Use ```http.ListenAndServeTLS``` together with a ```key.pem``` and ```cert.pem```
+3. Error Handling and Logging
+    1. Use of ```log.Fatal```
+4. Use of Hash to store user pasword
+    1. bcrypt
+
+---
+***Default Configuration***
+
 Default admin user is ```admin```
 
 Default password is stored in ```.env``` file
@@ -19,9 +34,10 @@ xml file format for ```database.xml``` :
     </attendence>
 </data>
 ```
+Put ```cert.pem``` and ```key.pem``` in the root directory.
+
+---
 _**Rapid Development of Attendance Taking Application using Templates and Go**_
-
-
 
 ```
 Instructions

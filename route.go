@@ -81,7 +81,8 @@ func uploadXML(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	//check to ensure method is post
-	if req.Method != "POST" {
+	if req.Method != http.MethodPost {
+
 		http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 		return
 	}
