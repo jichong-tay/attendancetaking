@@ -2,3 +2,7 @@
 *.env
 # Ignore files related to env
 *.xml
+# Ignore start
+start
+# Ignore pem
+*.pem

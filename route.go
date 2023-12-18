@@ -1,16 +1,16 @@
 package main
 
 import (
-	"encoding/xml"
 	"fmt"
 	"html/template"
+	"io"
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	uuid "github.com/google/uuid"
-	"github.com/joho/godotenv"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -22,57 +22,118 @@ func init() {
 
 func route() {
 
+	//routing for css
 	http.Handle("/css/", http.StripPrefix("/css", http.FileServer(http.Dir("./css"))))
 	http.HandleFunc("/", index)
 	http.HandleFunc("/restricted", restricted)
-	http.HandleFunc("/signup", signup)
+	//http.HandleFunc("/signup", signup)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/logout", logout)
 	http.HandleFunc("/record", record)
-	http.HandleFunc("/upload", uploadFile)
+	http.HandleFunc("/upload", uploadXML)
+	http.HandleFunc("/import", importXML)
+	http.HandleFunc("/export", exportXML)
+	http.HandleFunc("/backup", backup)
 	http.Handle("/favicon.ico", http.NotFoundHandler())
 
 }
 
-func uploadFile(res http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(res, "Uploading File")
-	//1. parse input, type multipart/form-data
-	//2. retreieve file from posted form-data
-	//3. write temporary file on our server
-	//4. return whether or not this is successful
-
+// backup is for saving the db
+func backup(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
+	}
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+	datafile.Attendancelist = attendancedb
+	//backupDB is to save the db to xml
+	backupDB(filename, datafile)
+	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
-func readDBv2(filename string, datafile data) {
-	f, err := os.Open(filename)
-	if nil != err {
-		log.Fatal(err)
+// export database to xml
+func exportXML(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
 	}
-	defer f.Close()
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+	datafile.Attendancelist = attendancedb
+	xmlData := generateXMLData(datafile)
 
-	decoder := xml.NewDecoder(f)
-	decoder.Decode(&datafile)
-	attendancedb = datafile.Attendancelist
+	res.Header().Set("Content-Disposition", "attachment; filename=datafile.xml")
+	res.Header().Set("Content-Type", "application/xml")
+	res.Write(xmlData)
+}
 
-	//godotenv to load environment file
-	err = godotenv.Load()
+// upload database from xml
+func uploadXML(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
+		http.Redirect(res, req, "/", http.StatusSeeOther)
+		return
+	}
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
+		return
+	}
+	//check to ensure method is post
+	if req.Method != http.MethodPost {
+
+		http.Redirect(res, req, "/restricted", http.StatusSeeOther)
+		return
+	}
+
+	//parse input, type multipart/form-data, checking file size)
+	req.Body = http.MaxBytesReader(res, req.Body, max_upload_size)
+	if err := req.ParseMultipartForm(max_upload_size); err != nil {
+		http.Error(res, fmt.Sprintf("The uploaded file is too big. Please choose an file less than %d mb \n %s \n", max_upload_size/1000, err.Error()), http.StatusBadRequest)
+		return
+	}
+
+	//retreieve file from posted form-data
+	file, fileHeader, err := req.FormFile("myFile")
+
 	if err != nil {
-		log.Fatal("Error loading .env file")
+		http.Error(res, err.Error(), http.StatusBadRequest)
+		return
 	}
-	//default password get from environment file
-	password := os.Getenv("PASSWORD")
-	bPassword, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
 
-	for _, v := range attendancedb {
-		mapUsers[v.Username] = user{
-			Username: v.Username,
-			Password: bPassword,
-			Isadmin:  false,
-		}
+	defer file.Close()
 
+	log.Printf("Uploaded File: %+v\n", fileHeader)
+
+	//write temporary file on our server
+
+	dst, err := os.Create(fmt.Sprintf("./data/database%s", filepath.Ext(fileHeader.Filename)))
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
 	}
+
+	defer dst.Close()
+
+	_, err = io.Copy(dst, file)
+	if err != nil {
+		http.Error(res, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	loadDB(filename, datafile)
+
+	log.Printf("Upload successful.\n")
+	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
+// index page to display attendance of user
 func index(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	userAttendance := userAttendance{}
@@ -89,9 +150,9 @@ func index(res http.ResponseWriter, req *http.Request) {
 	if err := tpl.ExecuteTemplate(res, "index.gohtml", userAttendance); err != nil {
 		log.Println(err)
 	}
-
 }
 
+// restricted page for admin users
 func restricted(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
@@ -108,48 +169,24 @@ func restricted(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func signup(res http.ResponseWriter, req *http.Request) {
-	if alreadyLoggedIn(req) {
+// import function to route admin user to import page
+func importXML(res http.ResponseWriter, req *http.Request) {
+	myUser := getUser(res, req)
+	if !alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
 		return
 	}
-	var myUser user
-	// process form submission
-	if req.Method == http.MethodPost {
-		// get form values
-		username := req.FormValue("username")
-		password := req.FormValue("password")
-		if username != "" {
-			// check if username exist/ taken
-			if _, ok := mapUsers[username]; ok {
-				http.Error(res, "Username already taken", http.StatusForbidden)
-				return
-			}
-			// create session
-			id := uuid.New()
-			myCookie := &http.Cookie{
-				Name:  "myCookie",
-				Value: id.String(),
-			}
-			http.SetCookie(res, myCookie)
-			mapSessions[myCookie.Value] = username
-
-			bPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
-			if err != nil {
-				http.Error(res, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-
-			myUser = user{username, bPassword, false}
-			mapUsers[username] = myUser
-		}
-		// redirect to main index
-		http.Redirect(res, req, "/", http.StatusSeeOther)
+	if !myUser.Isadmin {
+		http.Redirect(res, req, "/", http.StatusUnauthorized)
 		return
 	}
-	tpl.ExecuteTemplate(res, "signup.gohtml", myUser)
+
+	if err := tpl.ExecuteTemplate(res, "import.gohtml", attendancedb); err != nil {
+		log.Println(err)
+	}
 }
 
+// login users
 func login(res http.ResponseWriter, req *http.Request) {
 	if alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -187,6 +224,7 @@ func login(res http.ResponseWriter, req *http.Request) {
 	tpl.ExecuteTemplate(res, "login.gohtml", nil)
 }
 
+// logout users
 func logout(res http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -206,6 +244,7 @@ func logout(res http.ResponseWriter, req *http.Request) {
 	http.Redirect(res, req, "/", http.StatusSeeOther)
 }
 
+// record attendance
 func record(res http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -233,3 +272,77 @@ func record(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 }
+
+// getUser that is login in the current session
+func getUser(res http.ResponseWriter, req *http.Request) user {
+	// get current session cookie
+	myCookie, err := req.Cookie("myCookie")
+	if err != nil {
+		id := uuid.New()
+		myCookie = &http.Cookie{
+			Name:  "myCookie",
+			Value: id.String(),
+		}
+	}
+	http.SetCookie(res, myCookie)
+
+	// if the user exists already, get user
+	var myUser user
+	if username, ok := mapSessions[myCookie.Value]; ok {
+		myUser = mapUsers[username]
+	}
+	return myUser
+}
+
+// alreadyLoggedIn is to check if user is already logged in.
+func alreadyLoggedIn(req *http.Request) bool {
+	myCookie, err := req.Cookie("myCookie")
+	if err != nil {
+		return false
+	}
+	username := mapSessions[myCookie.Value]
+	_, ok := mapUsers[username]
+	return ok
+}
+
+// func signup(res http.ResponseWriter, req *http.Request) {
+// 	if alreadyLoggedIn(req) {
+// 		http.Redirect(res, req, "/", http.StatusSeeOther)
+// 		return
+// 	}
+// 	var myUser user
+// 	// process form submission
+// 	if req.Method == http.MethodPost {
+// 		// get form values
+// 		username := req.FormValue("username")
+// 		password := req.FormValue("password")
+// 		if username != "" {
+// 			// check if username exist/ taken
+// 			if _, ok := mapUsers[username]; ok {
+// 				http.Error(res, "Username already taken", http.StatusForbidden)
+// 				return
+// 			}
+// 			// create session
+// 			id := uuid.New()
+// 			myCookie := &http.Cookie{
+// 				Name:  "myCookie",
+// 				Value: id.String(),
+// 			}
+// 			http.SetCookie(res, myCookie)
+// 			mapSessions[myCookie.Value] = username
+
+// 			bPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+// 			if err != nil {
+// 				http.Error(res, "Internal server error", http.StatusInternalServerError)
+// 				return
+// 			}
+
+// 			myUser = user{username, bPassword, false}
+// 			mapUsers[username] = myUser
+// 		}
+// 		// redirect to main index
+// 		http.Redirect(res, req, "/", http.StatusSeeOther)
+// 		return
+// 	}
+// 	tpl.ExecuteTemplate(res, "signup.gohtml", myUser)
+// }

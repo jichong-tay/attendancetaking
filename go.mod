@@ -1,4 +1,4 @@
-module loginout
+module attendancetaking
 
 go 1.21
 

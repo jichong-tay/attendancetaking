@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -11,7 +10,8 @@ import (
 )
 
 const (
-	filename = "data/database.xml"
+	filename        = "data/database.xml"
+	max_upload_size = 1 << 20 //1 mb
 )
 
 func init() {
@@ -31,23 +31,14 @@ func init() {
 		Isadmin:  true,
 	}
 
-	// mapUsers["john"] = user{
-	// 	Username: "john",
-	// 	Password: bPassword,
-	// 	Isadmin:  false,
-	// }
-
-	// attendancedb = append(attendancedb, attendance{"john", "mon"})
-	// attendancedb = append(attendancedb, attendance{"john", "tues"})
-
 }
 func main() {
 
 	route()
+
 	log.Println("server started")
 
-	readDB(filename, datafile)
-	fmt.Println("main database:", datafile.Attendancelist)
-	//writeDB(filename, datafile)
-	http.ListenAndServe(":5221", nil)
+	loadDB(filename, datafile)
+
+	log.Fatal(http.ListenAndServeTLS(":5332", "cert.pem", "key.pem", nil))
 }
