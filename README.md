@@ -16,11 +16,12 @@
 ---
 ***Default Configuration***
 
-Default admin user is ```admin```
+Start the application by running ```make run```
 
-Default password is stored in ```.env``` file
+- Default admin user is ```admin```
+- Default password is stored in ```.env``` file
 
-create a ```database.xml``` at ```./data``` folder. 
+Create a ```database.xml``` at ```./data``` folder. 
 
 xml file format for ```database.xml``` :
 

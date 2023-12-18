@@ -35,10 +35,10 @@ func init() {
 func main() {
 
 	route()
+
 	log.Println("server started")
 
 	loadDB(filename, datafile)
-	log.Println("main database:", datafile.Attendancelist)
-	//log.Fatal(http.ListenAndServe(":5221", nil))
-	log.Fatal(http.ListenAndServeTLS(":5221", "cert.pem", "key.pem", nil))
+
+	log.Fatal(http.ListenAndServeTLS(":5332", "cert.pem", "key.pem", nil))
 }

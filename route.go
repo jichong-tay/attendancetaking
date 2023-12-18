@@ -22,10 +22,11 @@ func init() {
 
 func route() {
 
+	//routing for css
 	http.Handle("/css/", http.StripPrefix("/css", http.FileServer(http.Dir("./css"))))
 	http.HandleFunc("/", index)
 	http.HandleFunc("/restricted", restricted)
-	http.HandleFunc("/signup", signup)
+	//http.HandleFunc("/signup", signup)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/logout", logout)
 	http.HandleFunc("/record", record)
@@ -37,6 +38,7 @@ func route() {
 
 }
 
+// backup is for saving the db
 func backup(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
@@ -48,10 +50,12 @@ func backup(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 	datafile.Attendancelist = attendancedb
+	//backupDB is to save the db to xml
 	backupDB(filename, datafile)
 	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
+// export database to xml
 func exportXML(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
@@ -70,6 +74,7 @@ func exportXML(res http.ResponseWriter, req *http.Request) {
 	res.Write(xmlData)
 }
 
+// upload database from xml
 func uploadXML(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
@@ -128,6 +133,7 @@ func uploadXML(res http.ResponseWriter, req *http.Request) {
 	http.Redirect(res, req, "/restricted", http.StatusSeeOther)
 }
 
+// index page to display attendance of user
 func index(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	userAttendance := userAttendance{}
@@ -146,6 +152,7 @@ func index(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// restricted page for admin users
 func restricted(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
@@ -162,6 +169,7 @@ func restricted(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// import function to route admin user to import page
 func importXML(res http.ResponseWriter, req *http.Request) {
 	myUser := getUser(res, req)
 	if !alreadyLoggedIn(req) {
@@ -178,48 +186,7 @@ func importXML(res http.ResponseWriter, req *http.Request) {
 	}
 }
 
-func signup(res http.ResponseWriter, req *http.Request) {
-	if alreadyLoggedIn(req) {
-		http.Redirect(res, req, "/", http.StatusSeeOther)
-		return
-	}
-	var myUser user
-	// process form submission
-	if req.Method == http.MethodPost {
-		// get form values
-		username := req.FormValue("username")
-		password := req.FormValue("password")
-		if username != "" {
-			// check if username exist/ taken
-			if _, ok := mapUsers[username]; ok {
-				http.Error(res, "Username already taken", http.StatusForbidden)
-				return
-			}
-			// create session
-			id := uuid.New()
-			myCookie := &http.Cookie{
-				Name:  "myCookie",
-				Value: id.String(),
-			}
-			http.SetCookie(res, myCookie)
-			mapSessions[myCookie.Value] = username
-
-			bPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
-			if err != nil {
-				http.Error(res, "Internal server error", http.StatusInternalServerError)
-				return
-			}
-
-			myUser = user{username, bPassword, false}
-			mapUsers[username] = myUser
-		}
-		// redirect to main index
-		http.Redirect(res, req, "/", http.StatusSeeOther)
-		return
-	}
-	tpl.ExecuteTemplate(res, "signup.gohtml", myUser)
-}
-
+// login users
 func login(res http.ResponseWriter, req *http.Request) {
 	if alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -257,6 +224,7 @@ func login(res http.ResponseWriter, req *http.Request) {
 	tpl.ExecuteTemplate(res, "login.gohtml", nil)
 }
 
+// logout users
 func logout(res http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -276,6 +244,7 @@ func logout(res http.ResponseWriter, req *http.Request) {
 	http.Redirect(res, req, "/", http.StatusSeeOther)
 }
 
+// record attendance
 func record(res http.ResponseWriter, req *http.Request) {
 	if !alreadyLoggedIn(req) {
 		http.Redirect(res, req, "/", http.StatusSeeOther)
@@ -303,3 +272,77 @@ func record(res http.ResponseWriter, req *http.Request) {
 		return
 	}
 }
+
+// getUser that is login in the current session
+func getUser(res http.ResponseWriter, req *http.Request) user {
+	// get current session cookie
+	myCookie, err := req.Cookie("myCookie")
+	if err != nil {
+		id := uuid.New()
+		myCookie = &http.Cookie{
+			Name:  "myCookie",
+			Value: id.String(),
+		}
+	}
+	http.SetCookie(res, myCookie)
+
+	// if the user exists already, get user
+	var myUser user
+	if username, ok := mapSessions[myCookie.Value]; ok {
+		myUser = mapUsers[username]
+	}
+	return myUser
+}
+
+// alreadyLoggedIn is to check if user is already logged in.
+func alreadyLoggedIn(req *http.Request) bool {
+	myCookie, err := req.Cookie("myCookie")
+	if err != nil {
+		return false
+	}
+	username := mapSessions[myCookie.Value]
+	_, ok := mapUsers[username]
+	return ok
+}
+
+// func signup(res http.ResponseWriter, req *http.Request) {
+// 	if alreadyLoggedIn(req) {
+// 		http.Redirect(res, req, "/", http.StatusSeeOther)
+// 		return
+// 	}
+// 	var myUser user
+// 	// process form submission
+// 	if req.Method == http.MethodPost {
+// 		// get form values
+// 		username := req.FormValue("username")
+// 		password := req.FormValue("password")
+// 		if username != "" {
+// 			// check if username exist/ taken
+// 			if _, ok := mapUsers[username]; ok {
+// 				http.Error(res, "Username already taken", http.StatusForbidden)
+// 				return
+// 			}
+// 			// create session
+// 			id := uuid.New()
+// 			myCookie := &http.Cookie{
+// 				Name:  "myCookie",
+// 				Value: id.String(),
+// 			}
+// 			http.SetCookie(res, myCookie)
+// 			mapSessions[myCookie.Value] = username
+
+// 			bPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.MinCost)
+// 			if err != nil {
+// 				http.Error(res, "Internal server error", http.StatusInternalServerError)
+// 				return
+// 			}
+
+// 			myUser = user{username, bPassword, false}
+// 			mapUsers[username] = myUser
+// 		}
+// 		// redirect to main index
+// 		http.Redirect(res, req, "/", http.StatusSeeOther)
+// 		return
+// 	}
+// 	tpl.ExecuteTemplate(res, "signup.gohtml", myUser)
+// }
